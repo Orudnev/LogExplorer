@@ -115,8 +115,17 @@ app.get("/api/logRows", async (req: Request, res: Response) => {
       let r = await processLineByLine(filePath, respList.length);
       respList = [...respList, ...r];
     }
+    respList.sort((a,b)=>{
+      if(a.Date && b.Date){
+        return a.Date.getTime() - b.Date.getTime();
+      } 
+      if(!a && !b) return 0;
+      return a?1:-1;
+    });
+    respList.forEach((itm,idx)=>{itm.id = idx});
     result.response = respList;
   }
+  
   res.write(JSON.stringify(result));    
   res.end();
 });
