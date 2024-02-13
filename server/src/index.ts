@@ -12,7 +12,7 @@ dotenv.config();
 const app: Express = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.static('public'));
 app.use(cors());
 app.use(express.json()); 
 
@@ -135,7 +135,7 @@ app.get("/api/filterSetFile",(req: Request, res: Response)=>{
   res.write(JSON.stringify(result));    
   res.end();
 });
-
+ 
 app.post("/api/updateFilterSetFolder", (req: Request, res: Response)=>{
   let result: IrequestResult = {
     response: undefined,
