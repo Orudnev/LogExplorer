@@ -1,11 +1,17 @@
 export enum LogRowResult {
   undefined = 0,
   highlighted = 1,
-  errWrongOrder = 2
+  backgr1 = 2,
+  backgr2 = 4,
+  isNewFltGroupStart = 8, //Строка содержит в себе значение указанное в первой строке набора фильтров
+  errMissingRowsInFltGroup = 16,
+  errWrongOrder = 32,
+  groupIsCorrect = 64,
+  groupIsWrong = 128
 }
 
 export interface ILogRow {
-  RowNumber: number;
+  id: number;
   RowLineNumber: number;
   Severety: string;
   Date: Date | undefined;

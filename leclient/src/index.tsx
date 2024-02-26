@@ -10,6 +10,7 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
+// "proxy": "http://localhost:5000/api",
 
 root.render(
   <Provider store={store}>

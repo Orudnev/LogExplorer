@@ -1,7 +1,8 @@
 import axios from "axios";
 import { IApiResponse, IFilterSetFolder, ILogRow } from "./CommonTypes";
 
-const baseUrl='http://localhost:5000/api/';
+const baseUrl= `http://${window.location.hostname}:5000/api/`;
+
 export function Dir(handler:(fileList:string[])=>void){
     let srvUrl = baseUrl+'dir';
     httpGet(srvUrl,undefined,handler);

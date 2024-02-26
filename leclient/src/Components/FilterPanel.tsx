@@ -3,12 +3,14 @@ import { Input } from '@mui/base/Input';
 import { SelectAndEditItemList } from './SelectAndEditItemList/SelectAndEditItemList';
 import { ToolbarButton, ToolbarCheckButton } from './ToolbarButton';
 import * as Api from '../WebApiWrapper';
-import { IFilterSet, IFilterSetFolder } from '../CommonTypes';
+import { IFilterSet, IFilterSetFolder, ILogRow } from '../CommonTypes';
 import { AppSessionData } from './AppData';
+import { FilterPanelTotals } from './FilterPanelTotals';
 
-interface IFilterPanel {
-    rows: string[];
-    onChange: (frows: string[], isFilterOn: boolean) => void;
+export interface IFilterPanel {
+    fltRows: string[];
+    dataRows: ILogRow[];
+    onChange: (frows: string[], isFilterOn: boolean, grpFilter: number) => void;
 }
 
 interface IFilterPanelRow {
@@ -54,22 +56,23 @@ function FilterPanelRow(props: IFilterPanelRow) {
 
 
 export function FilterPanel(props: IFilterPanel) {
-    const [frows, setFrows] = useState(props.rows);
+    const [frows, setFrows] = useState(props.fltRows);
     const [isFilterOn, setIsFilterOn] = useState(false);
     const [filterFileContent, setFilterFileContent] = useState<IFilterSetFolder[]>([]);
     const [selectedFolder, setSelectedFolder] = useState('');
     const [selectedFilterSet, setSelectedFilterSet] = useState('');
+    const [groupFilter, setGroupFilter] = useState(0);
     useEffect(() => {
         Api.LoadFilterSetFile((fList: IFilterSetFolder[]) => {
             setFilterFileContent(fList);
-            let storedFolder = 
-                fList.find(itm=>itm.name.toLocaleLowerCase() === AppSessionData.prop('LastSelectedFolder').toLocaleLowerCase());
-            if(storedFolder){
+            let storedFolder =
+                fList.find(itm => itm.name.toLocaleLowerCase() === AppSessionData.prop('LastSelectedFolder').toLocaleLowerCase());
+            if (storedFolder) {
                 setSelectedFolder(storedFolder.name);
                 let storedFset =
-                storedFolder.filterSetList
-                    .find(itm=>itm.name.toLocaleLowerCase() === AppSessionData.prop('LastSelectedFilterSet').toLocaleLowerCase());
-                if(storedFset){
+                    storedFolder.filterSetList
+                        .find(itm => itm.name.toLocaleLowerCase() === AppSessionData.prop('LastSelectedFilterSet').toLocaleLowerCase());
+                if (storedFset) {
                     setSelectedFilterSet(storedFset.name);
                     setFrows(storedFset.filterRows);
                 }
@@ -79,7 +82,7 @@ export function FilterPanel(props: IFilterPanel) {
     let folderList = filterFileContent.length > 0 ? filterFileContent.map(itm => itm.name) : [];
     let selectedFolderListItem = (folderList.length > 0 && selectedFolder) ? filterFileContent.find(itm => itm.name === selectedFolder) : undefined;
     let filterSetList: string[] = [];
-    let getFilterSet = (fsetName: string,folderName:string = selectedFolder) => {
+    let getFilterSet = (fsetName: string, folderName: string = selectedFolder) => {
         let result = undefined;
         let folderItem = filterFileContent.find(itm => itm.name === folderName);
         if (folderItem) {
@@ -93,10 +96,10 @@ export function FilterPanel(props: IFilterPanel) {
             fset.filterRows = frows;
         }
         let folderItem = filterFileContent.find(itm => itm.name === selectedFolder);
-        if(folderItem){
+        if (folderItem) {
             Api.SaveFolder(folderItem, (resp) => {
                 let s = 1;
-            });    
+            });
         }
     }
 
@@ -115,7 +118,7 @@ export function FilterPanel(props: IFilterPanel) {
                     caption='Выбор папки'
                     selectedItem={selectedFolder} onSelected={(selFolder) => {
                         setSelectedFolder(selFolder);
-                        if(!selFolder){
+                        if (!selFolder) {
                             setSelectedFilterSet('');
                         }
                     }}
@@ -143,10 +146,10 @@ export function FilterPanel(props: IFilterPanel) {
                         let fsetItem = getFilterSet(selFset)
                         if (fsetItem) {
                             setFrows(fsetItem.filterRows);
-                            AppSessionData.prop('LastSelectedFolder',selectedFolder);
-                            AppSessionData.prop('LastSelectedFilterSet',selFset);
+                            AppSessionData.prop('LastSelectedFolder', selectedFolder);
+                            AppSessionData.prop('LastSelectedFilterSet', selFset);
                         }
-                        
+
                     }}
                     onAdd={(item) => {
                         let newItem: IFilterSet = {
@@ -168,7 +171,7 @@ export function FilterPanel(props: IFilterPanel) {
                     }}
                 />
                 <ToolbarButton toolTip='Применить изменения' image='apply' size='48' onClick={() => {
-                    props.onChange(frows, isFilterOn);
+                    props.onChange(frows, isFilterOn, groupFilter);
                 }} />
                 {frows.length > 1 || (frows.length == 1 && frows[0])
                     ? (
@@ -181,7 +184,7 @@ export function FilterPanel(props: IFilterPanel) {
                             value={isFilterOn}
                             onClick={() => {
                                 setIsFilterOn(!isFilterOn);
-                                props.onChange(frows, !isFilterOn);
+                                props.onChange(frows, !isFilterOn, groupFilter);
                             }} />
                     ) : (<></>)
                 }
@@ -192,6 +195,12 @@ export function FilterPanel(props: IFilterPanel) {
                         }} />
                     ) : (<></>)
                 }
+                <FilterPanelTotals parentProps={props}
+                    showGroupFilter={isFilterOn} selectedValue={groupFilter}
+                    onGroupFilterChanged={(grpFltValue) => {
+                        setGroupFilter(grpFltValue);
+                        props.onChange(frows, isFilterOn, grpFltValue);
+                    }} />
 
             </div>
             <div className='filter-row-list'>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { DataGrid, GridRowsProp, GridColDef, GridCellParams } from '@mui/x-data-grid';
+import { DataGrid, GridRowsProp, GridColDef, GridCellParams, useGridApiRef } from '@mui/x-data-grid';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { Dayjs } from 'dayjs';
 import * as Api from '../WebApiWrapper';
@@ -9,21 +9,23 @@ import { ILogRow, LogRowResult } from '../CommonTypes';
 import { AppGlobal } from '../App';
 import { AppSessionData } from './AppData';
 import { FilterPanel } from './FilterPanel';
+import { FilterPanelTotals } from './FilterPanelTotals';
 
 
 
 
 export function MainPage() {
     let dfltRows: ILogRow[] = [];
+    let dfltCurrRow: ILogRow = { id: -1, RowLineNumber: -1, Severety: "", Date: undefined, ThreadId: undefined, Comment: "" };
     const [allRowList, setAllRowList] = useState(dfltRows);
     const [rowList, setRowList] = useState(dfltRows);
-    const [currRow, setCurrRow] = useState<ILogRow>({ RowNumber: -1, RowLineNumber: -1, Severety: "", Date: undefined, ThreadId: undefined, Comment: "" });
+    const [currRow, setCurrRow] = useState<ILogRow>(dfltCurrRow);
     const [dateFrom, setDateFrom] = React.useState<Dayjs | null>(dayjs(new Date(AppSessionData.prop('TsFromFilter'))));
     const [dateTo, setDateTo] = React.useState<Dayjs | null>(dayjs(new Date(AppSessionData.prop('TsToFilter'))));
     const [isLoading, setIsLoading] = useState(false);
     const [severityFltValue, setSeverityFltValue] = useState(AppSessionData.prop('SeverityFilter'));
     const [error, setError] = useState("");
-
+    const datagrid = useGridApiRef();
     if (isLoading) {
         return (<div>'Loading...'</div>);
     }
@@ -84,27 +86,57 @@ export function MainPage() {
                         (
                             <div className='main-page-toolbar__error'>{error}</div>)
                         : (
-                            <FilterPanel rows={[""]}
-                                onChange={(frows, isFilterOn) => {
-                                    let newRows = ApplyFilter(allRowList, frows, isFilterOn);
+                            <div className='filter-panel-wrapper'>
+                                <FilterPanel fltRows={[""]} dataRows={rowList}
+                                    onChange={(frows, isFilterOn, grpFilter) => {
+                                        let newRows = ApplyFilter(allRowList, frows, isFilterOn, grpFilter);
+                                        let cr = currRow;
+                                        let dg = datagrid;
+                                        if (newRows.length > 0) {
+                                            setRowList(newRows);
+                                            if (!isFilterOn && currRow && currRow.id > -1) {
+                                                dg.current.selectRow(currRow.id, true);
+                                                let pgSize = 100;
+                                                let pageNum = Math.trunc(currRow.id / 100);
+                                                let positionOnPage = currRow.id % pgSize;
+                                                dg.current.setPageSize(pgSize);
+                                                setTimeout(() => { 
+                                                    dg.current.setPage(pageNum);                                                    
+                                                    dg.current.scrollToIndexes({rowIndex:currRow.id});
+                                                }, 100);
+                                            }
+                                        }
+                                    }}
+                                />
+                                {/* <FilterPanelTotals grpFilterValue={groupFilter} rows={rowList} onGroupFilterChanged={(flt)=>{
+                                    setGroupFilter(flt);
+                                    let newRows = ApplyGroupFilter(rowList,flt);
                                     if (newRows.length > 0) {
                                         setRowList(newRows);
                                     }
-                                }}
-                            />
+                                }} /> */}
+                            </div>
                         )
                     }
                 </div>
             </div>
             <div className='datagrid-and-details'>
                 <div className='datagrid-container'>
-                    <DataGrid rowHeight={25}
+                    <DataGrid apiRef={datagrid}
+                        rowHeight={25}
                         rows={rowList}
                         columns={columns}
                         getCellClassName={(params: GridCellParams<any, any, number>) => {
                             let trow = params.row as ILogRow;
                             if (params.field === 'Comment' && (trow.Result && (trow.Result & LogRowResult.highlighted) > 0)) {
-                                return "datagrid-row_highlight"
+                                let bckgr = "";
+                                if ((trow.Result & LogRowResult.backgr1) > 0) {
+                                    bckgr = "datagrid-row_highligt-stripe1";
+                                }
+                                if ((trow.Result & LogRowResult.backgr2) > 0) {
+                                    bckgr = "datagrid-row_highligt-stripe2";
+                                }
+                                return `datagrid-row_highlight ${bckgr}`;
                             }
                             if (params.field === 'Img' && trow.ResultMessage) {
                                 return "img-error bckgrSize24";
@@ -141,41 +173,105 @@ export function MainPage() {
     );
 }
 
-function ApplyFilter(allRows: ILogRow[], filterList: string[], isFilterOn: boolean): ILogRow[] {
+
+
+function ApplyFilter(allRows: ILogRow[], filterList: string[], isFilterOn: boolean, grpFilter: number): ILogRow[] {
     if (filterList.length === 1 && !filterList[0]) {
         return allRows;
     }
     let lastMatchedFilterRowIndex = -1;
+    let lastGroupItemIndexList: number[] = []; //список индексов строк последней группы
+    let isBackgr1 = true; //переключатель BackgroundColor для выделения групп полосками
+    let result: ILogRow[] = [];
     let checkRowOrder = (row: ILogRow, fltIndex: number) => {
         if (filterList.length === 0) {
             return;
         }
         let expectedIndex = lastMatchedFilterRowIndex + 1;
         if (expectedIndex > filterList.length - 1) {
+            //группа фильтров завершена, сбрасываем индекс в 0
             expectedIndex = 0;
         }
         if (expectedIndex != fltIndex) {
-            row.Result = LogRowResult.highlighted | LogRowResult.errWrongOrder;
-            row.ResultMessage = `Ожидаемое значение: ${filterList[expectedIndex]}`
+            if (fltIndex !== 0) {
+                row.Result = LogRowResult.highlighted | LogRowResult.errWrongOrder;
+                row.ResultMessage = `Ожидаемое значение: ${filterList[expectedIndex]}`
+            } else {
+                //несовпавшее значение соответствует началу очередной группы набора фильтров
+                row.Result = LogRowResult.highlighted | LogRowResult.isNewFltGroupStart; //отмечаем начало очередной группы для текущей строки
+                //проверяем прошлую группу на некомплектность
+                if (lastGroupItemIndexList.length > 0 && lastGroupItemIndexList.length < filterList.length) {
+                    let prevGrStartRow = result[lastGroupItemIndexList[0]];
+                    let r = prevGrStartRow.Result;
+                    prevGrStartRow.Result = r ? r | LogRowResult.errMissingRowsInFltGroup : LogRowResult.errMissingRowsInFltGroup;
+                    prevGrStartRow.ResultMessage = "Группа неполная, отсутствуют некоторые элементы";
+                    let s = 1;
+                }
+            }
+        } else {
+            //совпавшее значение фильтра соответствует ожидаемому
+            if (expectedIndex == 0) {
+                //совпавшее значение соответствует началу очередной группы набора фильтров
+                row.Result = LogRowResult.highlighted | LogRowResult.isNewFltGroupStart;
+            }
         }
     }
-
-    let result: ILogRow[] = [];
+    let setGroupStatus = () => {
+        let grMembers = lastGroupItemIndexList.map(itm => result[itm]);
+        let hasErrors = grMembers.some(itm =>
+            itm.Result && (
+                (itm.Result & LogRowResult.errWrongOrder) > 0
+                || (itm.Result & LogRowResult.errMissingRowsInFltGroup) > 0
+            ));
+        let grStatus = hasErrors ? LogRowResult.groupIsWrong : LogRowResult.groupIsCorrect;
+        grMembers.forEach(itm => {
+            let v = itm.Result ? itm.Result | grStatus : grStatus;
+            itm.Result = v;
+        });
+    };
     allRows.forEach((row, ind) => {
         let fltIndex = filterList.findIndex(flt => row.Comment.toLowerCase().includes(flt.toLowerCase()));
         if (fltIndex === -1 && isFilterOn) {
+            // - строка не содержит в себе ни одного значения из набора фильтров
+            // - фильтрация записей включена
+            // Решение : строка не будет включена в результирующий список
             return;
         }
         let newRow = { ...row };
         if (fltIndex === -1 && !isFilterOn) {
+            // - строка не содержит в себе ни одного значения из набора фильтров
+            // - фильтрация записей отключена
+            // Решение : добавляем несовпавшую строку в результирующий список
             result.push(newRow);
             return;
         }
-        newRow.Result = LogRowResult.highlighted;;
-        checkRowOrder(row, fltIndex);
+        // строка содержит в себе значение filterList[fltIndex] 
+        newRow.Result = LogRowResult.highlighted; // Выделяем строку (highlighted) 
+        checkRowOrder(newRow, fltIndex);
         result.push(newRow);
+        if ((newRow.Result & LogRowResult.isNewFltGroupStart) > 0) {
+            setGroupStatus();
+            lastGroupItemIndexList = [];
+        }
+        lastGroupItemIndexList.push(result.length - 1);
         lastMatchedFilterRowIndex = fltIndex;
     });
+    if (grpFilter !== 0) {
+        result = result.filter(itm => {
+            return itm.Result && (itm.Result & grpFilter) > 0;
+        });
+    }
 
+    result.forEach((itm, idx) => {
+        //раскрашиваем группы полосками
+        if (itm.Result && ((itm.Result & LogRowResult.groupIsCorrect) > 0 || ((itm.Result & LogRowResult.groupIsWrong) > 0))) {
+            if (itm.Result & LogRowResult.isNewFltGroupStart) {
+                isBackgr1 = !isBackgr1;
+            }
+            let backGr = isBackgr1 ? LogRowResult.backgr1 : LogRowResult.backgr2;
+            let v = itm.Result | backGr;
+            itm.Result = v;
+        }
+    });
     return result;
 }
