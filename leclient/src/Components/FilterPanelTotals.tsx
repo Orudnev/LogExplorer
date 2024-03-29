@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { ILogRow, LogRowResult } from '../CommonTypes';
+import { ILogRow, LogRowResult,IFilterPanel } from '../CommonTypes';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormControl from '@mui/material/FormControl';
 import FormLabel from '@mui/material/FormLabel';
-import { IFilterPanel } from './FilterPanel';
 
 export interface IFilterPanelTotals {
     parentProps:IFilterPanel;
@@ -28,10 +27,10 @@ export function FilterPanelTotals(props: IFilterPanelTotals) {
     let wrongGroupCount = 0;
     let errWrongOrderCount = 0;
     props.parentProps.dataRows.forEach(row => {
-        if (row.Result) {
+        if (row.Result) { 
             if ((row.Result & LogRowResult.highlighted) > 0) highlightedRows++;
-            if (((row.Result & LogRowResult.isNewFltGroupStart) > 0 && row.Result & LogRowResult.groupIsCorrect) > 0) correctGroupCount++;
-            if (((row.Result & LogRowResult.isNewFltGroupStart) > 0 && row.Result & LogRowResult.groupIsWrong) > 0) wrongGroupCount++;
+            if ((row.Result & LogRowResult.isNewFltGroupStart) > 0 && (row.Result & LogRowResult.groupIsCorrect) > 0) correctGroupCount++;
+            if ((row.Result & LogRowResult.isNewFltGroupStart) > 0 && (row.Result & LogRowResult.groupIsWrong) > 0) wrongGroupCount++;
             if ((row.Result & LogRowResult.errWrongOrder) > 0) errWrongOrderCount++;
         }
     })

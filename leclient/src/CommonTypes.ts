@@ -1,3 +1,26 @@
+export interface IFilterPanelRowValue {
+  searchCriteria:string;
+  mustSkip:boolean;
+}
+
+export interface IFilterPanel {
+  fltRows: IFilterPanelRowValue[];
+  dataRows: ILogRow[];
+  onChange: (frows: IFilterPanelRowValue[], isFilterOn: boolean, showSelItemsOnly:boolean, grpFilter: number) => void;
+}
+
+
+export interface IFilterPanelRow {
+  rows: IFilterPanelRowValue[];
+  index: number;
+  onChangedValue: (index: number, newValue: IFilterPanelRowValue) => void;
+  onDeleteRowBtnClick: (index: number) => void;
+  onAddRowBtnClick: () => void;
+  onMoveRowUp:(index:number) => void;
+  onMoveRowDown:(index:number) => void;
+}
+
+
 export enum LogRowResult {
   undefined = 0,
   highlighted = 1,
@@ -7,7 +30,8 @@ export enum LogRowResult {
   errMissingRowsInFltGroup = 16,
   errWrongOrder = 32,
   groupIsCorrect = 64,
-  groupIsWrong = 128
+  groupIsWrong = 128,
+  selectedByUser = 256
 }
 
 export interface ILogRow {
@@ -30,7 +54,7 @@ export interface IApiResponse{
 export interface IFilterSet{
   name:string;
   description:string;
-  filterRows:string[];
+  filterRows:IFilterPanelRowValue[];
 }
 
 export interface IFilterSetFolder{

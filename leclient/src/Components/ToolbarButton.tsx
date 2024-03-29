@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Tooltip from '@mui/material/Tooltip';
 
-export type TToolbarButtonImage = 'apply'|'cancel'|'plus'|'minus'|'filter-on'|'filter-off'|'refresh'|'gear'|'exit'|'save'|'error';
+export type TToolbarButtonImage = 'apply'|'cancel'|'plus'|'minus'|'filter-on'|'filter-off'|'refresh'|'gear'|'exit'|'save'|'error'|'up'|'down'|'trash-on'|'trash-off'|'selitems-on'|'selitems-off';
 export type TToolbarBtnSize = '56'|'48'|'32'|'24';
 export interface IToolbarButton{
     toolTip:string;

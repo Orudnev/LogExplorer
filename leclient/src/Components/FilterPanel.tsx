@@ -3,34 +3,46 @@ import { Input } from '@mui/base/Input';
 import { SelectAndEditItemList } from './SelectAndEditItemList/SelectAndEditItemList';
 import { ToolbarButton, ToolbarCheckButton } from './ToolbarButton';
 import * as Api from '../WebApiWrapper';
-import { IFilterSet, IFilterSetFolder, ILogRow } from '../CommonTypes';
+import { IFilterSet, IFilterSetFolder, ILogRow, IFilterPanel, IFilterPanelRow, IFilterPanelRowValue } from '../CommonTypes';
 import { AppSessionData } from './AppData';
 import { FilterPanelTotals } from './FilterPanelTotals';
 
-export interface IFilterPanel {
-    fltRows: string[];
-    dataRows: ILogRow[];
-    onChange: (frows: string[], isFilterOn: boolean, grpFilter: number) => void;
-}
-
-interface IFilterPanelRow {
-    rows: string[];
-    index: number;
-    onChangedValue: (index: number, newValue: string) => void;
-    onDeleteRowBtnClick: (index: number) => void;
-    onAddRowBtnClick: () => void;
-}
-
 function FilterPanelRow(props: IFilterPanelRow) {
-    const [value, setValue] = useState("");
+    const [value, setValue] = useState(props.rows[props.index]);
     useEffect(() => {
         setValue(props.rows[props.index]);
     }, [props]);
     let plusbtn = <></>;
     let minusbtn = <></>;
+    let upbtn = <></>;
+    let downbtn = <></>;
+    let trashbtn = <ToolbarCheckButton
+        toolTip='Пропускать строки содержащие указанное значение'
+        imageOn='trash-on'
+        imageOff='trash-off'
+        image='cancel'
+        size='24'
+        value={value.mustSkip}
+        onClick={() => {
+            let currRow = { ...value };
+            currRow.mustSkip = !currRow.mustSkip;
+            setValue(currRow);
+            props.onChangedValue(props.index, currRow);
+        }} />
+
     if (props.rows.length > 1) {
         minusbtn = <ToolbarButton toolTip='Удалить строку' image='minus' size='24' class='filter-row__button' onClick={() => {
             props.onDeleteRowBtnClick(props.index);
+        }} />
+    }
+    if (props.index > 0) {
+        upbtn = <ToolbarButton toolTip='Переместить строку вверх' image='up' size='24' class='filter-row__button' onClick={() => {
+            props.onMoveRowUp(props.index);
+        }} />
+    }
+    if (props.index < props.rows.length - 1) {
+        downbtn = <ToolbarButton toolTip='Переместить строку вниз' image='down' size='24' class='filter-row__button' onClick={() => {
+            props.onMoveRowDown(props.index);
         }} />
     }
     if (props.index === props.rows.length - 1) {
@@ -38,18 +50,24 @@ function FilterPanelRow(props: IFilterPanelRow) {
             props.onAddRowBtnClick();
         }} />
     }
+
     return (
         <div className='filter-row'>
             <div className='filter-row__id'>{props.index}</div>
-            <Input autoFocus={true} className='filter-row__input' value={value}
+            <Input autoFocus={true} className='filter-row__input' value={value.searchCriteria}
                 onChange={(e) => {
-                    let newValue = e.currentTarget.value;
-                    setValue(newValue);
-                    props.rows[props.index] = newValue;
+                    let newSearchCriteria = e.currentTarget.value;
+                    let currRow = props.rows[props.index];
+                    currRow.searchCriteria = newSearchCriteria;
+                    setValue({ ...currRow });
+                    props.onChangedValue(props.index, currRow);
                 }}
             />
             {minusbtn}
             {plusbtn}
+            {upbtn}
+            {downbtn}
+            {trashbtn}
         </div>
     );
 }
@@ -58,6 +76,7 @@ function FilterPanelRow(props: IFilterPanelRow) {
 export function FilterPanel(props: IFilterPanel) {
     const [frows, setFrows] = useState(props.fltRows);
     const [isFilterOn, setIsFilterOn] = useState(false);
+    const [showSelItems, setShowSelItems] = useState(false);
     const [filterFileContent, setFilterFileContent] = useState<IFilterSetFolder[]>([]);
     const [selectedFolder, setSelectedFolder] = useState('');
     const [selectedFilterSet, setSelectedFilterSet] = useState('');
@@ -126,7 +145,7 @@ export function FilterPanel(props: IFilterPanel) {
                         let newItem: IFilterSetFolder = {
                             name: item,
                             description: '',
-                            filterSetList: [{ name: 'default', description: '', filterRows: [''] }]
+                            filterSetList: [{ name: 'default', description: '', filterRows: [{ searchCriteria: "", mustSkip: false }] }]
                         };
                         filterFileContent.push(newItem);
                         setSelectedFolder(item);
@@ -155,7 +174,7 @@ export function FilterPanel(props: IFilterPanel) {
                         let newItem: IFilterSet = {
                             name: item,
                             description: '',
-                            filterRows: ['']
+                            filterRows: [{ searchCriteria: "", mustSkip: false }]
                         }
                         let folderItem = filterFileContent.find(itm => itm.name === selectedFolder);
                         if (folderItem) {
@@ -171,7 +190,7 @@ export function FilterPanel(props: IFilterPanel) {
                     }}
                 />
                 <ToolbarButton toolTip='Применить изменения' image='apply' size='48' onClick={() => {
-                    props.onChange(frows, isFilterOn, groupFilter);
+                    props.onChange(frows, isFilterOn, showSelItems, groupFilter);
                 }} />
                 {frows.length > 1 || (frows.length == 1 && frows[0])
                     ? (
@@ -183,8 +202,29 @@ export function FilterPanel(props: IFilterPanel) {
                             size='48'
                             value={isFilterOn}
                             onClick={() => {
-                                setIsFilterOn(!isFilterOn);
-                                props.onChange(frows, !isFilterOn, groupFilter);
+                                let newIsFilterOn = !isFilterOn;
+                                let newShowSelItems = newIsFilterOn ? false : showSelItems;
+                                setShowSelItems(newShowSelItems);
+                                setIsFilterOn(newIsFilterOn);
+                                props.onChange(frows, newIsFilterOn, newShowSelItems, groupFilter);
+                            }} />
+                    ) : (<></>)
+                }
+                {frows.length > 1 || (frows.length == 1 && frows[0])
+                    ? (
+                        <ToolbarCheckButton
+                            toolTip='Показать только выбранные пользователем записи'
+                            imageOn='selitems-on'
+                            imageOff='selitems-off'
+                            image='cancel'
+                            size='48'
+                            value={showSelItems}
+                            onClick={() => {
+                                let newShowSelItems = !showSelItems;
+                                let newIsFilterOn = newShowSelItems ? false : isFilterOn;
+                                setShowSelItems(newShowSelItems);
+                                setIsFilterOn(newIsFilterOn);
+                                props.onChange(frows, newIsFilterOn, newShowSelItems, groupFilter);
                             }} />
                     ) : (<></>)
                 }
@@ -199,7 +239,7 @@ export function FilterPanel(props: IFilterPanel) {
                     showGroupFilter={isFilterOn} selectedValue={groupFilter}
                     onGroupFilterChanged={(grpFltValue) => {
                         setGroupFilter(grpFltValue);
-                        props.onChange(frows, isFilterOn, grpFltValue);
+                        props.onChange(frows, isFilterOn, showSelItems, grpFltValue);
                     }} />
 
             </div>
@@ -213,11 +253,11 @@ export function FilterPanel(props: IFilterPanel) {
                         }}
                         onAddRowBtnClick={() => {
                             let newRowSet = [...frows];
-                            newRowSet.push("");
+                            newRowSet.push({ searchCriteria: "", mustSkip: false });
                             setFrows(newRowSet);
                         }}
                         onDeleteRowBtnClick={(ind) => {
-                            let newRowSet: string[] = [];
+                            let newRowSet: IFilterPanelRowValue[] = [];
                             frows.forEach((r, i) => {
                                 if (i === ind) {
                                     return;
@@ -226,6 +266,24 @@ export function FilterPanel(props: IFilterPanel) {
                             });
                             setFrows(newRowSet);
                         }}
+                        onMoveRowUp={(index) => {
+                            if (index > 0) {
+                                let prevRow = frows[index - 1];
+                                frows[index - 1] = frows[index];
+                                frows[index] = prevRow;
+                                setFrows([...frows]);
+                            }
+                        }}
+                        onMoveRowDown={(index) => {
+                            if (index < frows.length - 1) {
+                                let nextRow = frows[index + 1];
+                                frows[index + 1] = frows[index];
+                                frows[index] = nextRow;
+                                setFrows([...frows]);
+                            }
+
+                        }}
+
                     />;
                 })}
             </div>

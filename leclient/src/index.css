@@ -106,6 +106,10 @@
   color: red;
 }
 
+.datagrid-row_background-highlight {
+  background-color: yellow;
+}
+
 .datagrid-row_highligt-stripe1{
   background-color: rgb(249, 236, 219);
 }
